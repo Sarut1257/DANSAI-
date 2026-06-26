@@ -23,7 +23,9 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
   const [showSkillAuraMessage, setShowSkillAuraMessage] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Boss and progression states
+  // Level & Boss progression states
+  const [currentLevel, setCurrentLevel] = useState(1);
+  const [levelIntroActive, setLevelIntroActive] = useState(false);
   const [enemiesDefeated, setEnemiesDefeated] = useState(0);
   const [bossHp, setBossHp] = useState<number | null>(null);
   const [bossMaxHp] = useState<number>(12);
@@ -32,9 +34,20 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
   // High performance loop references
   const scoreRef = useRef(0);
   const livesRef = useRef(5);
+  const scoreAtLevelStartRef = useRef(0);
+  const livesAtLevelStartRef = useRef(5);
   const soundMutedRef = useRef(!options.soundEnabled);
   const multiplierRef = useRef(1);
   const isPausedRef = useRef(false);
+
+  // Trigger level transition intro card
+  useEffect(() => {
+    setLevelIntroActive(true);
+    const timer = setTimeout(() => {
+      setLevelIntroActive(false);
+    }, 2800);
+    return () => clearTimeout(timer);
+  }, [currentLevel]);
 
   useEffect(() => {
     isPausedRef.current = isPaused;
@@ -158,20 +171,44 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    // Level-specific environmental colors
+    let skyColor = '#030208';
+    let fogColor = '#030208';
+    let fogDensity = 0.04;
+    let ambientColor = '#2a1f4d';
+    let dirColor = '#ff7300';
+    let centerColor = '#ff3a00';
+
+    if (currentLevel === 2) {
+      skyColor = '#130416';
+      fogColor = '#130416';
+      fogDensity = 0.045;
+      ambientColor = '#3d1645';
+      dirColor = '#d946ef';
+      centerColor = '#ec4899';
+    } else if (currentLevel === 3) {
+      skyColor = '#0f0203';
+      fogColor = '#0f0203';
+      fogDensity = 0.05;
+      ambientColor = '#420d12';
+      dirColor = '#ef4444';
+      centerColor = '#f97316';
+    }
+
     // Scene setup with atmospheric dark midnight sky
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#030208');
-    scene.fog = new THREE.FogExp2('#030208', 0.04);
+    scene.background = new THREE.Color(skyColor);
+    scene.fog = new THREE.FogExp2(fogColor, fogDensity);
 
     // Camera setup
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
     camera.position.set(0, 11, 13);
 
     // Lights
-    const ambientLight = new THREE.AmbientLight('#2a1f4d', 0.9); // Deep purple/blue ambient festival glow
+    const ambientLight = new THREE.AmbientLight(ambientColor, 1.0);
     scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight('#ff7300', 1.4); // Traditional warm golden spotlight
+    const dirLight = new THREE.DirectionalLight(dirColor, 1.5);
     dirLight.position.set(15, 25, 15);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 1024;
@@ -185,8 +222,8 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
     dirLight.shadow.camera.bottom = -d;
     scene.add(dirLight);
 
-    // Add a glowing central orange point light at the holy Stupa
-    const centerPointLight = new THREE.PointLight('#ff3a00', 2, 20);
+    // Add a glowing central point light at the holy Stupa
+    const centerPointLight = new THREE.PointLight(centerColor, 2.5, 22);
     centerPointLight.position.set(0, 4, 0);
     scene.add(centerPointLight);
 
@@ -593,10 +630,18 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
       };
     };
 
-    // Spawn initial ghosts
-    for (let i = 0; i < 4; i++) {
-      const type = i === 0 ? 'red' : (i === 1 ? 'purple' : 'green');
-      const angle = (i / 4) * Math.PI * 2;
+    // Spawn initial ghosts based on current level
+    const initialCount = currentLevel === 1 ? 3 : currentLevel === 2 ? 4 : 5;
+    for (let i = 0; i < initialCount; i++) {
+      let type: 'green' | 'purple' | 'red' = 'green';
+      if (currentLevel === 1) {
+        type = i === 0 ? 'purple' : 'green';
+      } else if (currentLevel === 2) {
+        type = i === 0 ? 'red' : (i === 1 ? 'purple' : 'green');
+      } else {
+        type = i % 2 === 0 ? 'red' : 'purple';
+      }
+      const angle = (i / initialCount) * Math.PI * 2;
       const gx = Math.cos(angle) * 18;
       const gz = Math.sin(angle) * 18;
       ghosts.push(createGhost(type, gx, gz));
@@ -835,14 +880,43 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
       spawnSparks(x, 1.4, z, '#c084fc', 25, 'purify');
     };
 
+    // Global helper for enemy purification goals across different levels
+    const handleEnemyKilled = (x: number, z: number) => {
+      defeatedCount++;
+      setEnemiesDefeated(defeatedCount);
+
+      if (currentLevel === 1) {
+        if (defeatedCount >= 5 && !warpGateEntity) {
+          spawnWarpGate(x, z);
+        }
+      } else if (currentLevel === 2) {
+        if (defeatedCount >= 8 && !warpGateEntity) {
+          spawnWarpGate(x, z);
+        }
+      } else if (currentLevel === 3) {
+        if (defeatedCount >= 5 && !bossSpawnedOnce) {
+          spawnBoss();
+        }
+      }
+    };
+
     // Camera feedback states
     let cameraShake = 0;
 
-    scoreRef.current = 0;
-    livesRef.current = 5;
-    setScore(0);
-    setLives(5);
+    // Reset or carry over score & lives depending on active level
+    if (currentLevel === 1) {
+      scoreRef.current = 0;
+      livesRef.current = 5;
+      setScore(0);
+      setLives(5);
+    } else {
+      scoreRef.current = scoreAtLevelStartRef.current;
+      livesRef.current = livesAtLevelStartRef.current;
+      setScore(scoreAtLevelStartRef.current);
+      setLives(livesAtLevelStartRef.current);
+    }
     setMultiplier(1);
+    setEnemiesDefeated(0);
 
     // Spawner timers
     let ghostSpawnTimer = 0;
@@ -919,12 +993,7 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
               scoreRef.current += 150;
               setScore(scoreRef.current);
 
-              defeatedCount++;
-              setEnemiesDefeated(defeatedCount);
-
-              if (defeatedCount >= 10 && !bossSpawnedOnce) {
-                spawnBoss();
-              }
+              handleEnemyKilled(g.mesh.position.x, g.mesh.position.z);
 
               spawnSparks(g.mesh.position.x, g.mesh.position.y + 0.8, g.mesh.position.z, '#ffffff', 22, 'purify');
             }
@@ -1012,12 +1081,7 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
               g.deadVelZ = push.z * 0.28;
               g.deadRotVel = 0.16;
 
-              defeatedCount++;
-              setEnemiesDefeated(defeatedCount);
-
-              if (defeatedCount >= 10 && !bossSpawnedOnce) {
-                spawnBoss();
-              }
+              handleEnemyKilled(g.mesh.position.x, g.mesh.position.z);
             }
           });
         }
@@ -1216,9 +1280,14 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
         }
       });
 
-      // Periodically spawn new ghosts to maintain tension (every 1-3 seconds)
+      // Periodically spawn new ghosts to maintain tension (every 1-3 seconds, faster as levels progress)
       ghostSpawnTimer++;
-      const randomThreshold = 60 + Math.random() * 120; // 60 to 180 ticks (1-3s)
+      const randomThreshold = currentLevel === 1 
+        ? 90 + Math.random() * 120 
+        : currentLevel === 2 
+          ? 60 + Math.random() * 90 
+          : 45 + Math.random() * 75;
+
       if (ghostSpawnTimer > randomThreshold) {
         ghostSpawnTimer = 0;
         // Limit standard ghosts to 8, and stop spawning once the boss has spawned to let player focus on boss!
@@ -1227,7 +1296,14 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
           const angle = Math.random() * Math.PI * 2;
           const sx = playerPos.x + Math.cos(angle) * 19;
           const sz = playerPos.z + Math.sin(angle) * 19;
-          const types: ('green'|'purple'|'red')[] = ['green', 'purple', 'green'];
+          
+          let types: ('green' | 'purple' | 'red')[] = ['green', 'green', 'purple'];
+          if (currentLevel === 2) {
+            types = ['green', 'purple', 'purple', 'red'];
+          } else if (currentLevel === 3) {
+            types = ['purple', 'red', 'red'];
+          }
+          
           const rType = types[Math.floor(Math.random() * types.length)];
           ghosts.push(createGhost(rType, sx, sz));
         }
@@ -1465,9 +1541,15 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
           wg.active = false;
           synth.playCollect(!soundMutedRef.current);
           
-          // Warp player to the Ending!
+          // Warp player to the next level or ending!
           setTimeout(() => {
-            onEnding(scoreRef.current);
+            if (currentLevel < 3) {
+              scoreAtLevelStartRef.current = scoreRef.current;
+              livesAtLevelStartRef.current = livesRef.current;
+              setCurrentLevel((prev) => prev + 1);
+            } else {
+              onEnding(scoreRef.current);
+            }
           }, 400);
         }
       }
@@ -1593,7 +1675,7 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
       scene.clear();
       renderer.dispose();
     };
-  }, [options.selectedSkinId, skins]);
+  }, [options.selectedSkinId, skins, currentLevel]);
 
   // Toggle local mute state
   const toggleSound = () => {
@@ -1616,8 +1698,16 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
 
         {/* Dynamic Display Indicators */}
         <div className="flex items-center gap-6 sm:gap-8">
-          {/* Real-time score ticker */}
+          {/* Stage indicator */}
           <div className="flex flex-col items-center">
+            <span className="text-[9px] text-zinc-500 uppercase tracking-widest leading-none">STAGE</span>
+            <span className="text-xl font-bold font-mono tracking-wider text-yellow-500 mt-1">
+              {currentLevel} <span className="text-zinc-600 text-xs font-normal">/ 3</span>
+            </span>
+          </div>
+
+          {/* Real-time score ticker */}
+          <div className="flex flex-col items-center border-l border-zinc-900 pl-4 sm:pl-6">
             <span className="text-[9px] text-zinc-500 uppercase tracking-widest leading-none">SCORE</span>
             <span className="text-xl font-bold font-mono tracking-wider text-white mt-1">
               {score}
@@ -1628,7 +1718,7 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
           <div className="flex flex-col items-center border-l border-zinc-900 pl-4 sm:pl-6">
             <span className="text-[9px] text-zinc-500 uppercase tracking-widest leading-none">DEFEATED</span>
             <span className="text-xl font-bold font-mono tracking-wider text-amber-500 mt-1">
-              {enemiesDefeated} <span className="text-zinc-600 text-xs font-normal">/ 10</span>
+              {enemiesDefeated} <span className="text-zinc-600 text-xs font-normal">/ {currentLevel === 1 ? 5 : currentLevel === 2 ? 8 : 5}</span>
             </span>
           </div>
 
@@ -1743,6 +1833,33 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
               <div className="text-[9px] text-zinc-600 uppercase font-mono mt-5 tracking-widest">
                 PRESS ESC OR PRESS THE BUTTON TO PLAY
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Dynamic Level Title Card introduction overlay */}
+        {levelIntroActive && (
+          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-25 pointer-events-none transition-all duration-500 animate-fade-in font-kanit">
+            <div className="text-center p-6 border-y border-yellow-600/50 bg-zinc-950/90 w-full max-w-lg shadow-[0_0_40px_rgba(234,179,8,0.25)] relative">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 px-4 py-0.5 bg-yellow-600 text-black text-[9px] font-black uppercase tracking-widest">
+                STAGE ENTERED
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-yellow-500 tracking-wide uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] animate-pulse">
+                {currentLevel === 1 && "ด่านที่ 1: ตลาดเทศกาลละเล่นด่านซ้าย"}
+                {currentLevel === 2 && "ด่านที่ 2: ป่ามนตราหน้าพระธาตุ"}
+                {currentLevel === 3 && "ด่านที่ 3: สุสานศักดิ์สิทธิ์หน้าสุสานหลวง"}
+              </h2>
+              <p className="text-[10px] text-zinc-400 font-medium tracking-[0.2em] uppercase mt-1 mb-3.5">
+                {currentLevel === 1 && "STAGE 1: DAN SAI FESTIVAL MARKET"}
+                {currentLevel === 2 && "STAGE 2: MYSTIC FOREST NEAR PHRA THAT"}
+                {currentLevel === 3 && "STAGE 3: SACRED ARENA"}
+              </p>
+              <div className="w-2/3 h-[1px] bg-zinc-800 mx-auto mb-3.5" />
+              <p className="text-xs text-zinc-300 font-light leading-relaxed">
+                🎯 {currentLevel === 1 && "ปราบผีตาโขนขนาดเล็ก 5 ตน เพื่อเปิดประตูมิติ!"}
+                {currentLevel === 2 && "ปราบผีตาโขน 8 ตน เพื่อเปิดทางไปสู่สุสานโบราณ!"}
+                {currentLevel === 3 && "ปราบวิญญาณบริวาร 5 ตน เพื่อล่อ ผีตาโขนยักษ์ บอสใหญ่ออกมา!"}
+              </p>
             </div>
           </div>
         )}
