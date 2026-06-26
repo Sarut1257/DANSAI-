@@ -28,8 +28,22 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
   const [levelIntroActive, setLevelIntroActive] = useState(false);
   const [enemiesDefeated, setEnemiesDefeated] = useState(0);
   const [bossHp, setBossHp] = useState<number | null>(null);
-  const [bossMaxHp] = useState<number>(12);
+  const [bossMaxHp, setBossMaxHp] = useState<number>(12);
   const [bossSpawned, setBossSpawned] = useState(false);
+
+  const getUiRequiredEnemies = (lvl: number) => {
+    if (lvl === 1) return 5;
+    if (lvl === 2) return 8;
+    if (lvl === 3) return 5;
+    if (lvl === 4) return 12;
+    if (lvl === 5) return 15;
+    if (lvl === 6) return 8;
+    if (lvl === 7) return 18;
+    if (lvl === 8) return 22;
+    if (lvl === 9) return 10;
+    if (lvl === 10) return 12;
+    return 10;
+  };
 
   // High performance loop references
   const scoreRef = useRef(0);
@@ -180,19 +194,68 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
     let centerColor = '#ff3a00';
 
     if (currentLevel === 2) {
-      skyColor = '#130416';
-      fogColor = '#130416';
+      skyColor = '#100514';
+      fogColor = '#100514';
       fogDensity = 0.045;
-      ambientColor = '#3d1645';
+      ambientColor = '#2b0c36';
       dirColor = '#d946ef';
       centerColor = '#ec4899';
     } else if (currentLevel === 3) {
-      skyColor = '#0f0203';
-      fogColor = '#0f0203';
+      skyColor = '#0d0203';
+      fogColor = '#0d0203';
       fogDensity = 0.05;
-      ambientColor = '#420d12';
+      ambientColor = '#3d070b';
       dirColor = '#ef4444';
       centerColor = '#f97316';
+    } else if (currentLevel === 4) {
+      skyColor = '#020d0a';
+      fogColor = '#020d0a';
+      fogDensity = 0.045;
+      ambientColor = '#062e24';
+      dirColor = '#06b6d4';
+      centerColor = '#10b981';
+    } else if (currentLevel === 5) {
+      skyColor = '#120a02';
+      fogColor = '#120a02';
+      fogDensity = 0.042;
+      ambientColor = '#362104';
+      dirColor = '#fbbf24';
+      centerColor = '#f59e0b';
+    } else if (currentLevel === 6) {
+      skyColor = '#0a0212';
+      fogColor = '#0a0212';
+      fogDensity = 0.048;
+      ambientColor = '#2e0b4e';
+      dirColor = '#f43f5e';
+      centerColor = '#ec4899';
+    } else if (currentLevel === 7) {
+      skyColor = '#0f0206';
+      fogColor = '#0f0206';
+      fogDensity = 0.045;
+      ambientColor = '#450a1a';
+      dirColor = '#f43f5e';
+      centerColor = '#be123c';
+    } else if (currentLevel === 8) {
+      skyColor = '#020612';
+      fogColor = '#020612';
+      fogDensity = 0.04;
+      ambientColor = '#061a3d';
+      dirColor = '#3b82f6';
+      centerColor = '#60a5fa';
+    } else if (currentLevel === 9) {
+      skyColor = '#0c0606';
+      fogColor = '#0c0606';
+      fogDensity = 0.052;
+      ambientColor = '#1c0d0d';
+      dirColor = '#dc2626';
+      centerColor = '#ef4444';
+    } else if (currentLevel === 10) {
+      skyColor = '#0d0902';
+      fogColor = '#0d0902';
+      fogDensity = 0.055;
+      ambientColor = '#2b1d03';
+      dirColor = '#f59e0b';
+      centerColor = '#eab308';
     }
 
     // Scene setup with atmospheric dark midnight sky
@@ -630,14 +693,16 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
       };
     };
 
-    // Spawn initial ghosts based on current level
-    const initialCount = currentLevel === 1 ? 3 : currentLevel === 2 ? 4 : 5;
+    // Spawn initial ghosts based on current level (increases as levels progress)
+    const initialCount = Math.min(8, 2 + Math.floor(currentLevel * 0.7));
     for (let i = 0; i < initialCount; i++) {
       let type: 'green' | 'purple' | 'red' = 'green';
       if (currentLevel === 1) {
         type = i === 0 ? 'purple' : 'green';
-      } else if (currentLevel === 2) {
-        type = i === 0 ? 'red' : (i === 1 ? 'purple' : 'green');
+      } else if (currentLevel <= 3) {
+        type = i === 0 ? 'red' : (i % 2 === 0 ? 'purple' : 'green');
+      } else if (currentLevel <= 6) {
+        type = i % 3 === 0 ? 'red' : (i % 3 === 1 ? 'purple' : 'green');
       } else {
         type = i % 2 === 0 ? 'red' : 'purple';
       }
@@ -749,6 +814,30 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
       if (bossSpawnedOnce) return;
       bossSpawnedOnce = true;
 
+      // Dynamic Boss stats based on currentLevel
+      let levelBossMaxHp = 12;
+      let scaleMultiplier = 1.0;
+      let bossColor = '#ef4444'; // Red sparklers
+      
+      if (currentLevel === 3) {
+        levelBossMaxHp = 12;
+        scaleMultiplier = 1.0;
+      } else if (currentLevel === 6) {
+        levelBossMaxHp = 24;
+        scaleMultiplier = 1.3;
+        bossColor = '#d946ef'; // Magenta sparklers
+      } else if (currentLevel === 9) {
+        levelBossMaxHp = 40;
+        scaleMultiplier = 1.6;
+        bossColor = '#f97316'; // Orange sparklers
+      } else if (currentLevel === 10) {
+        levelBossMaxHp = 60;
+        scaleMultiplier = 2.0;
+        bossColor = '#f59e0b'; // Gold sparklers
+      }
+
+      setBossMaxHp(levelBossMaxHp);
+
       const bGroup = new THREE.Group();
       bGroup.position.set(0, 1.4, -6); // Central upper spot
 
@@ -764,16 +853,22 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
         side: THREE.DoubleSide
       });
 
-      const bGeo = new THREE.PlaneGeometry(4.4, 4.4);
+      // Special visual aura on the final stage boss!
+      if (currentLevel === 10) {
+        bMat.emissive.set('#eab308');
+        bMat.emissiveIntensity = 0.4;
+      }
+
+      const bGeo = new THREE.PlaneGeometry(4.4 * scaleMultiplier, 4.4 * scaleMultiplier);
       const bSprite = new THREE.Mesh(bGeo, bMat);
-      bSprite.position.y = 2.1;
+      bSprite.position.y = 2.1 * scaleMultiplier;
       bSprite.castShadow = true;
       bSprite.receiveShadow = true;
       bGroup.add(bSprite);
 
       // Large boss shadow
       const bShadow = new THREE.Mesh(
-        new THREE.RingGeometry(0.01, 1.3, 32),
+        new THREE.RingGeometry(0.01, 1.3 * scaleMultiplier, 32),
         new THREE.MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.6, side: THREE.DoubleSide })
       );
       bShadow.rotation.x = -Math.PI / 2;
@@ -786,10 +881,10 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
         mesh: bGroup,
         spriteMesh: bSprite,
         texture: bTex,
-        health: 12,
-        maxHealth: 12,
+        health: levelBossMaxHp,
+        maxHealth: levelBossMaxHp,
         state: 'idle',
-        stateTimer: 90,
+        stateTimer: Math.max(30, 90 - (currentLevel * 4)), // Boss reacts faster on higher levels!
         targetPos: new THREE.Vector3(0, 1.4, -6),
         invulnFrames: 0,
         flashTimer: 0,
@@ -801,10 +896,10 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
 
       bossActive = true;
       setBossSpawned(true);
-      setBossHp(12);
+      setBossHp(levelBossMaxHp);
 
       // Sparklers decoration!
-      spawnSparks(0, 2.0, -6, '#ef4444', 30, 'purify');
+      spawnSparks(0, 2.0 * scaleMultiplier, -6, bossColor, 35, 'purify');
       synth.playCollect(!soundMutedRef.current);
     };
 
@@ -880,22 +975,37 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
       spawnSparks(x, 1.4, z, '#c084fc', 25, 'purify');
     };
 
+    const isBossLevel = (lvl: number) => {
+      return lvl === 3 || lvl === 6 || lvl === 9 || lvl === 10;
+    };
+
+    const getRequiredEnemies = (lvl: number) => {
+      if (lvl === 1) return 5;
+      if (lvl === 2) return 8;
+      if (lvl === 3) return 5; // to spawn boss 3
+      if (lvl === 4) return 12;
+      if (lvl === 5) return 15;
+      if (lvl === 6) return 8; // to spawn boss 6
+      if (lvl === 7) return 18;
+      if (lvl === 8) return 22;
+      if (lvl === 9) return 10; // to spawn boss 9
+      if (lvl === 10) return 12; // to spawn boss 10
+      return 10;
+    };
+
     // Global helper for enemy purification goals across different levels
     const handleEnemyKilled = (x: number, z: number) => {
       defeatedCount++;
       setEnemiesDefeated(defeatedCount);
 
-      if (currentLevel === 1) {
-        if (defeatedCount >= 5 && !warpGateEntity) {
-          spawnWarpGate(x, z);
-        }
-      } else if (currentLevel === 2) {
-        if (defeatedCount >= 8 && !warpGateEntity) {
-          spawnWarpGate(x, z);
-        }
-      } else if (currentLevel === 3) {
-        if (defeatedCount >= 5 && !bossSpawnedOnce) {
+      const required = getRequiredEnemies(currentLevel);
+      if (isBossLevel(currentLevel)) {
+        if (defeatedCount >= required && !bossSpawnedOnce) {
           spawnBoss();
+        }
+      } else {
+        if (defeatedCount >= required && !warpGateEntity) {
+          spawnWarpGate(x, z);
         }
       }
     };
@@ -1376,24 +1486,21 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
 
           if (b.stateTimer <= 0) {
             b.state = 'attacking';
-            b.stateTimer = 35; // firing frame delay
+            b.stateTimer = Math.max(15, 35 - currentLevel); // faster firing frame delay!
 
-            // Shoot 3 circular fireballs falling from sky
+            // Shoot dynamic fireballs based on level difficulty
+            const fireballCount = currentLevel === 3 ? 3 : currentLevel === 6 ? 4 : currentLevel === 9 ? 5 : 6;
             spawnFireball(b.mesh.position, playerPos);
 
-            const offset1 = new THREE.Vector3(
-              playerPos.x + (Math.random() - 0.5) * 6,
-              playerPos.y,
-              playerPos.z + (Math.random() - 0.5) * 6
-            );
-            spawnFireball(b.mesh.position, offset1);
-
-            const offset2 = new THREE.Vector3(
-              playerPos.x + (Math.random() - 0.5) * 8,
-              playerPos.y,
-              playerPos.z + (Math.random() - 0.5) * 8
-            );
-            spawnFireball(b.mesh.position, offset2);
+            for (let f = 1; f < fireballCount; f++) {
+              const spread = 4.0 + f * 2.0;
+              const offset = new THREE.Vector3(
+                playerPos.x + (Math.random() - 0.5) * spread,
+                playerPos.y,
+                playerPos.z + (Math.random() - 0.5) * spread
+              );
+              spawnFireball(b.mesh.position, offset);
+            }
 
             synth.playJump(!soundMutedRef.current);
           }
@@ -1401,7 +1508,7 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
           b.scaleFactor = 1.0;
           if (b.stateTimer <= 0) {
             b.state = 'idle';
-            b.stateTimer = 85;
+            b.stateTimer = Math.max(40, 85 - currentLevel * 4); // faster cooldown on higher levels!
           }
         }
 
@@ -1543,7 +1650,7 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
           
           // Warp player to the next level or ending!
           setTimeout(() => {
-            if (currentLevel < 3) {
+            if (currentLevel < 10) {
               scoreAtLevelStartRef.current = scoreRef.current;
               livesAtLevelStartRef.current = livesRef.current;
               setCurrentLevel((prev) => prev + 1);
@@ -1702,7 +1809,7 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
           <div className="flex flex-col items-center">
             <span className="text-[9px] text-zinc-500 uppercase tracking-widest leading-none">STAGE</span>
             <span className="text-xl font-bold font-mono tracking-wider text-yellow-500 mt-1">
-              {currentLevel} <span className="text-zinc-600 text-xs font-normal">/ 3</span>
+              {currentLevel} <span className="text-zinc-600 text-xs font-normal">/ 10</span>
             </span>
           </div>
 
@@ -1718,7 +1825,7 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
           <div className="flex flex-col items-center border-l border-zinc-900 pl-4 sm:pl-6">
             <span className="text-[9px] text-zinc-500 uppercase tracking-widest leading-none">DEFEATED</span>
             <span className="text-xl font-bold font-mono tracking-wider text-amber-500 mt-1">
-              {enemiesDefeated} <span className="text-zinc-600 text-xs font-normal">/ {currentLevel === 1 ? 5 : currentLevel === 2 ? 8 : 5}</span>
+              {enemiesDefeated} <span className="text-zinc-600 text-xs font-normal">/ {getUiRequiredEnemies(currentLevel)}</span>
             </span>
           </div>
 
@@ -1847,18 +1954,39 @@ export default function GameCanvas({ options, skins, onGameOver, onExit, onEndin
               <h2 className="text-xl sm:text-2xl font-black text-yellow-500 tracking-wide uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] animate-pulse">
                 {currentLevel === 1 && "ด่านที่ 1: ตลาดเทศกาลละเล่นด่านซ้าย"}
                 {currentLevel === 2 && "ด่านที่ 2: ป่ามนตราหน้าพระธาตุ"}
-                {currentLevel === 3 && "ด่านที่ 3: สุสานศักดิ์สิทธิ์หน้าสุสานหลวง"}
+                {currentLevel === 3 && "ด่านที่ 3: วิหารผีตาโขนยักษ์"}
+                {currentLevel === 4 && "ด่านที่ 4: ถ้ำสะกดวิญญาณใต้พิภพ"}
+                {currentLevel === 5 && "ด่านที่ 5: ทุ่งนาข้าวเหนียวสีทอง"}
+                {currentLevel === 6 && "ด่านที่ 6: ยอดดอยสายหมอกอารักษ์"}
+                {currentLevel === 7 && "ด่านที่ 7: คุ้มหลวงโบราณด่านซ้าย"}
+                {currentLevel === 8 && "ด่านที่ 8: บึงน้ำศักดิ์สิทธิ์สองรัก"}
+                {currentLevel === 9 && "ด่านที่ 9: ทางผ่านแดนปรโลกประตูนรก"}
+                {currentLevel === 10 && "ด่านที่ 10: พระธาตุศรีสองรักด่านสุดท้าย"}
               </h2>
               <p className="text-[10px] text-zinc-400 font-medium tracking-[0.2em] uppercase mt-1 mb-3.5">
                 {currentLevel === 1 && "STAGE 1: DAN SAI FESTIVAL MARKET"}
                 {currentLevel === 2 && "STAGE 2: MYSTIC FOREST NEAR PHRA THAT"}
-                {currentLevel === 3 && "STAGE 3: SACRED ARENA"}
+                {currentLevel === 3 && "STAGE 3: SHRINE OF THE GIANT PHI TA KHON"}
+                {currentLevel === 4 && "STAGE 4: UNDERWORLD SEALING CAVE"}
+                {currentLevel === 5 && "STAGE 5: GOLDEN STICKY RICE FIELDS"}
+                {currentLevel === 6 && "STAGE 6: MISTY MOUNTAIN PEAK GUARDIAN"}
+                {currentLevel === 7 && "STAGE 7: ANCIENT ROYAL MANOR"}
+                {currentLevel === 8 && "STAGE 8: SACRED SONG RAK BLESSING LAKE"}
+                {currentLevel === 9 && "STAGE 9: GATES OF THE UNDERWORLD TRANSIT"}
+                {currentLevel === 10 && "STAGE 10: THE ULTIMATE PHRA THAT SI SONG RAK"}
               </p>
               <div className="w-2/3 h-[1px] bg-zinc-800 mx-auto mb-3.5" />
               <p className="text-xs text-zinc-300 font-light leading-relaxed">
                 🎯 {currentLevel === 1 && "ปราบผีตาโขนขนาดเล็ก 5 ตน เพื่อเปิดประตูมิติ!"}
                 {currentLevel === 2 && "ปราบผีตาโขน 8 ตน เพื่อเปิดทางไปสู่สุสานโบราณ!"}
-                {currentLevel === 3 && "ปราบวิญญาณบริวาร 5 ตน เพื่อล่อ ผีตาโขนยักษ์ บอสใหญ่ออกมา!"}
+                {currentLevel === 3 && "ปราบวิญญาณบริวาร 5 ตน เพื่อล่อ บอสผีตาโขนยักษ์ ตนแรกออกมา!"}
+                {currentLevel === 4 && "ปราบผีตาโขนดุร้าย 12 ตน ในถ้ำที่ลึกที่สุด!"}
+                {currentLevel === 5 && "ปราบผีตาโขนรื่นเริง 15 ตน เพื่อปกป้องผลผลิตของชาวบ้าน!"}
+                {currentLevel === 6 && "ปราบวิญญาณสปิริต 8 ตน เพื่อเผชิญหน้ากับ บอสผีตาโขนคลั่งหมอก ระดับ 2!"}
+                {currentLevel === 7 && "ปราบผีตาโขนสิงสถิต 18 ตน ท่ามกลางอารยธรรมเก่าแก่!"}
+                {currentLevel === 8 && "ปราบผีตาโขนพิทักษ์บึง 22 ตน เพื่อรับน้ำมนต์ศักดิ์สิทธิ์!"}
+                {currentLevel === 9 && "ปราบผีตาโขนดวงวิญญาณ 10 ตน เพื่อดึง บอสอสูรตาโขนอัคคี ระดับ 3!"}
+                {currentLevel === 10 && "ด่านสุดท้าย! ปราบผีบริวาร 12 ตน ก่อนปะทะ จอมราชันย์ผีตาโขนยักษ์สุวรรณภูมิ!"}
               </p>
             </div>
           </div>
